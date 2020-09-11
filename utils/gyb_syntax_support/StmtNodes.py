@@ -192,6 +192,7 @@ STMT_NODES = [
                    node_choices=[
                        Child('Expression', kind='Expr'),
                        Child('Availablity', kind='AvailabilityCondition'),
+                       Child('Unavailablity', kind='UnavailabilityCondition'),
                        Child('MatchingPattern',
                              kind='MatchingPatternCondition'),
                        Child('OptionalBinding',
@@ -228,6 +229,16 @@ STMT_NODES = [
              Child('TypeAnnotation', kind='TypeAnnotation',
                    is_optional=True),
              Child('Initializer', kind='InitializerClause'),
+         ]),
+
+    # unavailability-condition -> '#unavailable' '(' availability-spec ')'
+    Node('UnavailabilityCondition', kind='Syntax',
+         children=[
+             Child('PoundUnavailableKeyword', kind='PoundUnavailableToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('AvailabilitySpec', kind='AvailabilitySpecList',
+                   collection_element_name='AvailabilityArgument'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 
     # condition-list -> condition

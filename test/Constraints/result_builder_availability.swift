@@ -82,6 +82,13 @@ tuplify(true) { cond in
         globalFuncAvailableOn10_52() // expected-error{{'globalFuncAvailableOn10_52()' is only available in macOS 10.52 or newer}}
         // expected-note@-1{{add 'if #available' version check}}
       }
+      if cond, #unavailable(OSX 10.52, *) { // expected-warning{{function builder 'TupleBuilder' does not implement 'buildLimitedAvailability'; this code may crash on earlier versions of the OS}}
+        cond2
+        globalFuncAvailableOn10_52() // expected-error{{'globalFuncAvailableOn10_52()' is only available in macOS 10.52 or newer}}
+        // expected-note@-1{{add 'if #available' version check}}
+      } else {
+        globalFuncAvailableOn10_52()
+      }
     }
   }
 }
@@ -134,6 +141,11 @@ func tuplifyWithAvailabilityErasure<T>(_ cond: Bool, @TupleBuilderAvailability b
 
 tuplifyWithAvailabilityErasure(true) { cond in
   if cond, #available(OSX 10.52, *) {
+    globalFuncAvailableOn10_52()
+  }
+  if cond, #unavailable(OSX 10.52, *) {
+    cond
+  } else {
     globalFuncAvailableOn10_52()
   }
 }

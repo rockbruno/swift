@@ -1249,10 +1249,20 @@ validateAvailabilitySpecList(Parser &P,
 }
 
 // #available(...)
+// #unavailable(...)
 ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   SyntaxParsingContext ConditonCtxt(SyntaxContext,
                                     SyntaxKind::AvailabilityCondition);
-  SourceLoc PoundLoc = consumeToken(tok::pound_available);
+  SourceLoc PoundLoc;
+
+  bool isUnavailability;
+  if (Tok.is(tok::pound_available)) {
+    isUnavailability = false;
+    PoundLoc = consumeToken();
+  } else {
+    isUnavailability = true;
+    PoundLoc = consumeToken(tok::pound_unavailable);
+  }
 
   if (!Tok.isFollowingLParen()) {
     diagnose(Tok, diag::avail_query_expected_condition);
@@ -1287,7 +1297,7 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
     Status.setIsParseError();
 
   auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
-                                            RParenLoc);
+                                            RParenLoc, isUnavailability);
   return makeParserResult(Status, result);
 }
 
@@ -1434,7 +1444,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   ParserStatus Status;
 
   // Parse a leading #available condition if present.
-  if (Tok.is(tok::pound_available)) {
+  if (Tok.isAny(tok::pound_available, tok::pound_unavailable)) {
     auto res = parseStmtConditionPoundAvailable();
     if (res.isNull() || res.hasCodeCompletion()) {
       Status |= res;
