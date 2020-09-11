@@ -1641,7 +1641,7 @@ public:
                             StringRef &BindingKindStr);
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
-  ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
+  ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable(bool isUnavailability);
   ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo,
                                  bool IfWasImplicitlyInserted = false);
   ParserResult<Stmt> parseStmtGuard();

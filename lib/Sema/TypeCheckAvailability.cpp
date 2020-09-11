@@ -413,6 +413,9 @@ private:
 
     TypeRefinementContext *StartingTRC = getCurrentTRC();
 
+    // Tracks if we're refining for availability or unavailability.
+    Optional<bool> isRefiningUnavailability = None;
+
     for (StmtConditionElement Element : Cond) {
       TypeRefinementContext *CurrentTRC = getCurrentTRC();
       AvailabilityContext CurrentInfo = CurrentTRC->getAvailabilityInfo();
@@ -433,6 +436,16 @@ private:
       // #available query: introduce a new refinement context for the statement
       // condition elements following it.
       auto *Query = Element.getAvailability();
+
+      // Prevent availability and unavailability from mixing, like
+      // if #available(...) == false, #available(...)
+      if (isRefiningUnavailability == None) {
+        isRefiningUnavailability = Query->getIsUnavailability();
+      } else if (isRefiningUnavailability != Query->getIsUnavailability()) {
+        Context.Diags.diagnose(Query->getLoc(),
+        diag::availability_cannot_be_positive_and_negative_at_same_time);
+        break;
+      }
 
       // If this query expression has no queries, we will not introduce a new
       // refinement context. We do not diagnose here: a diagnostic will already
@@ -483,6 +496,11 @@ private:
       // the range for the spec, then a version query can never be false, so the
       // spec is useless. If so, report this.
       if (CurrentInfo.isContainedIn(NewConstraint)) {
+        // Unavailability refinements are always "useless" from a symbol availability
+        // point of view, so only useless availability specs are reported.
+        if (isRefiningUnavailability.getValue()) {
+          continue;
+        }
         DiagnosticEngine &Diags = Context.Diags;
         // Some availability checks will always pass because the minimum
         // deployment target guarantees they will never be false. We don't
@@ -528,7 +546,6 @@ private:
       ++NestedCount;
     }
 
-
     Optional<AvailabilityContext> FalseRefinement = None;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
@@ -543,16 +560,18 @@ private:
       FalseRefinement = FalseFlow;
     }
 
-    if (NestedCount == 0)
-      return std::make_pair(None, FalseRefinement);
-
     TypeRefinementContext *NestedTRC = getCurrentTRC();
     while (NestedCount-- > 0)
       ContextStack.pop_back();
 
     assert(getCurrentTRC() == StartingTRC);
 
-    return std::make_pair(NestedTRC->getAvailabilityInfo(), FalseRefinement);
+    if (!isRefiningUnavailability.hasValue() || !isRefiningUnavailability.getValue()) {
+      return std::make_pair(NestedTRC->getAvailabilityInfo(), FalseRefinement);
+    } else {
+      // If this is an unavailability check, simply invert the result.
+      return std::make_pair(FalseRefinement, NestedTRC->getAvailabilityInfo());
+    }
   }
 
   /// Return the best active spec for the target platform or nullptr if no

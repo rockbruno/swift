@@ -1245,10 +1245,14 @@ static void validateAvailabilitySpecList(Parser &P,
   Specs = RecognizedSpecs;
 }
 
-// #available(...)
-ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
+// #available(...) / !#available(...) / #available(...) == true/false
+ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable(bool isUnavailability) {
   SyntaxParsingContext ConditonCtxt(SyntaxContext,
                                     SyntaxKind::AvailabilityCondition);
+
+  if (isUnavailability) {
+    consumeToken(tok::exclaim_postfix);
+  }
   SourceLoc PoundLoc = consumeToken(tok::pound_available);
 
   if (!Tok.isFollowingLParen()) {
@@ -1283,8 +1287,24 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
                          diag::avail_query_expected_rparen, LParenLoc))
     Status.setIsParseError();
 
+  // == true/false
+  if (Tok.isAnyOperator() && Tok.getText() == "==") {
+    consumeToken();
+    if (Tok.is(tok::kw_false)) {
+        // Treat double negation from
+        // !#available(...) == false
+        isUnavailability = !isUnavailability;
+        consumeToken();
+    } else if (Tok.is(tok::kw_true)) {
+      consumeToken();
+    } else {
+      diagnose(Tok, diag::unavailability_does_not_support_expressions);
+      Status.setIsParseError();
+    }
+  }
+
   auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
-                                            RParenLoc);
+                                            RParenLoc, isUnavailability);
   return makeParserResult(Status, result);
 }
 
@@ -1378,8 +1398,9 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   ParserStatus Status;
 
   // Parse a leading #available condition if present.
-  if (Tok.is(tok::pound_available)) {
-    auto res = parseStmtConditionPoundAvailable();
+  if (Tok.is(tok::pound_available) || (Tok.is(tok::exclaim_postfix) && 
+      peekToken().is(tok::pound_available))) {
+    auto res = parseStmtConditionPoundAvailable(Tok.is(tok::exclaim_postfix));
     if (res.isNull() || res.hasCodeCompletion()) {
       Status |= res;
       return Status;

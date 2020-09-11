@@ -909,6 +909,12 @@ WARNING(parameter_unnamed_warn,none,
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
 
+ERROR(unavailability_does_not_support_expressions,none,
+      "availability equality only supports boolean literals", ())
+
+ERROR(availability_cannot_be_positive_and_negative_at_same_time,none,
+      "cannot have availability and unavailability in the same statement; result may cause impossible constraints", ())
+
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
 

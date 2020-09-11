@@ -12,11 +12,6 @@ let x = #available(OSX 10.51, *)  // expected-error {{#available may only be use
 
 (#available(OSX 10.51, *) ? 1 : 0) // expected-error {{#available may only be used as condition of an}}
 
-if !#available(OSX 10.52, *) { // expected-error {{#available may only be used as condition of an}}
-}
-if let _ = Optional(5), !#available(OSX 10.52, *) { // expected-error {{#available may only be used as condition}}
-}
-
 if #available(OSX 10.51, *) && #available(OSX 10.52, *) { // expected-error {{expected ',' joining parts of a multi-clause condition}} {{28-31=,}}
 }
 
@@ -109,4 +104,20 @@ if let _ = Optional(42), #available(iOS 8.0, *) {}
 if #available(macOS 10.51, *) {
 }
 
+// Negative availability.
+//if !#available(OSX 10.52, *) {
+//}
+//if let _ = Optional(5), !#available(OSX 10.52, *) {
+//}
+//if !#available(OSX 10.52, *), let _ = Optional(5) {
+//}
+if let _ = Optional(5), #available(OSX 10.52, *) == false {
+}
+if #available(OSX 10.52, *) == false, let _ = Optional(5) {
+}
+if #available(macOS 10.51, *) == false {
+}
 
+// Allow verbose positive form as well.
+if #available(macOS 10.51, *) == true {
+}
