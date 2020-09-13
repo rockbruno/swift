@@ -440,6 +440,32 @@ protected:
     return buildIfChainRecursive(ifStmt, 0, numPayloads, isOptional,
                                  /*isTopLevel=*/true);
   }
+  
+  /// If there is a #available in the condition, the 'then' will be
+  /// wrapped in a call to buildLimitedAvailability(_:), if available.
+  /// If this is instead a #unavailability condition, the 'else' will
+  /// be wrapped instead.
+  Expr *wrapInLimitedAvailabilityIfNeeded(IfStmt *ifStmt, Expr *arg, 
+                                          bool isUnavailability = false) {
+    auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
+    bool builderSupportsAvailability = builderSupports(ctx.Id_buildLimitedAvailability);
+
+    if (availabilityCond && 
+        availabilityCond->getAvailability()->getIsUnavailability() == isUnavailability &&
+        builderSupportsAvailability) {
+      SourceLoc endLoc;
+      if (isUnavailability) {
+        endLoc = ifStmt->getEndLoc();
+      } else {
+        endLoc = ifStmt->getThenStmt()->getEndLoc();
+      }
+      return buildCallIfWanted(
+          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
+          { arg }, { Identifier() });
+    } else {
+      return arg;
+    }
+  }
 
   /// Recursively build an if-chain: build an expression which will have
   /// a value of the chain result type before any call to `buildIf`.
@@ -484,16 +510,9 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
-    // If there is a #available in the condition, the 'then' will need to
-    // be wrapped in a call to buildLimitedAvailability(_:), if available.
     Expr *thenVarRefExpr = buildVarRef(
         thenVar, ifStmt->getThenStmt()->getEndLoc());
-    if (findAvailabilityCondition(ifStmt->getCond()) &&
-        builderSupports(ctx.Id_buildLimitedAvailability)) {
-      thenVarRefExpr = buildCallIfWanted(
-          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
-          { thenVarRefExpr }, { Identifier() });
-    }
+    thenVarRefExpr = wrapInLimitedAvailabilityIfNeeded(ifStmt, thenVarRefExpr);
 
     // Prepare the `then` operand by wrapping it to produce a chain result.
     Expr *thenExpr = buildWrappedChainPayload(
@@ -508,19 +527,19 @@ protected:
       assert(isOptional);
       elseLoc = ifStmt->getEndLoc();
       elseExpr = buildNoneExpr(elseLoc);
-
-    // - If there's an `else if`, the chain expression from that
-    //   should already be producing a chain result.
-    } else if (isElseIf) {
-      elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
-      elseLoc = ifStmt->getElseLoc();
-
-    // - Otherwise, wrap it to produce a chain result.
     } else {
       elseLoc = ifStmt->getElseLoc();
-      elseExpr = buildWrappedChainPayload(
-          buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
-          payloadIndex + 1, numPayloads, isOptional);
+      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+      elseVarRefExpr = wrapInLimitedAvailabilityIfNeeded(ifStmt, elseVarRefExpr, true);
+      // - If there's an `else if`, the chain expression from that
+      //   should already be producing a chain result.
+      if (isElseIf) {
+        elseExpr = elseVarRefExpr;
+      // - Otherwise, wrap it to produce a chain result.
+      } else {
+        elseExpr = buildWrappedChainPayload(
+            elseVarRefExpr, payloadIndex + 1, numPayloads, isOptional);
+      }
     }
 
     // The operand should have optional type if we had optional results,
@@ -1232,11 +1251,19 @@ public:
     // have had the chance to adopt buildLimitedAvailability(), we'll upgrade
     // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
-      // FIXME: #unavailable
       SourceLoc loc = availabilityCond->getStartLoc();
-      Type thenBodyType = solution.simplifyType(
+      Type bodyType;
+      if (availabilityCond->getAvailability()->getIsUnavailability()) {
+        // For #unavailable, we need to check the "else".
+        Type elseBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[1]));
+        bodyType = elseBodyType;
+      } else {
+        Type thenBodyType = solution.simplifyType(
           solution.getType(target.captured.second[0]));
-      thenBodyType.findIf([&](Type type) {
+        bodyType = thenBodyType;
+      }
+      bodyType.findIf([&](Type type) {
         auto nominal = type->getAnyNominal();
         if (!nominal)
           return false;
