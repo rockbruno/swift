@@ -1245,15 +1245,21 @@ static void validateAvailabilitySpecList(Parser &P,
   Specs = RecognizedSpecs;
 }
 
-// #available(...) / !#available(...) / #available(...) == true/false
-ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable(bool isUnavailability) {
+// #available(...)
+// #unavailable(...)
+ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   SyntaxParsingContext ConditonCtxt(SyntaxContext,
                                     SyntaxKind::AvailabilityCondition);
+  SourceLoc PoundLoc;
 
-  if (isUnavailability) {
-    consumeToken(tok::exclaim_postfix);
+  bool isUnavailability;
+  if (Tok.is(tok::pound_available)) {
+    isUnavailability = false;
+    PoundLoc = consumeToken();
+  } else {
+    isUnavailability = true;
+    PoundLoc = consumeToken(tok::pound_unavailable);
   }
-  SourceLoc PoundLoc = consumeToken(tok::pound_available);
 
   if (!Tok.isFollowingLParen()) {
     diagnose(Tok, diag::avail_query_expected_condition);
@@ -1286,22 +1292,6 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable(bool i
   if (parseMatchingToken(tok::r_paren, RParenLoc,
                          diag::avail_query_expected_rparen, LParenLoc))
     Status.setIsParseError();
-
-  // == true/false
-  if (Tok.isAnyOperator() && Tok.getText() == "==") {
-    consumeToken();
-    if (Tok.is(tok::kw_false)) {
-        // Treat double negation from
-        // !#available(...) == false
-        isUnavailability = !isUnavailability;
-        consumeToken();
-    } else if (Tok.is(tok::kw_true)) {
-      consumeToken();
-    } else {
-      diagnose(Tok, diag::unavailability_does_not_support_expressions);
-      Status.setIsParseError();
-    }
-  }
 
   auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
                                             RParenLoc, isUnavailability);
@@ -1398,9 +1388,8 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   ParserStatus Status;
 
   // Parse a leading #available condition if present.
-  if (Tok.is(tok::pound_available) || (Tok.is(tok::exclaim_postfix) && 
-      peekToken().is(tok::pound_available))) {
-    auto res = parseStmtConditionPoundAvailable(Tok.is(tok::exclaim_postfix));
+  if (Tok.isAny(tok::pound_available, tok::pound_unavailable)) {
+    auto res = parseStmtConditionPoundAvailable();
     if (res.isNull() || res.hasCodeCompletion()) {
       Status |= res;
       return Status;

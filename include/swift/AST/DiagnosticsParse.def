@@ -909,11 +909,8 @@ WARNING(parameter_unnamed_warn,none,
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
 
-ERROR(unavailability_does_not_support_expressions,none,
-      "availability equality only supports boolean literals", ())
-
-ERROR(availability_cannot_be_positive_and_negative_at_same_time,none,
-      "cannot have availability and unavailability in the same statement; result may cause impossible constraints", ())
+ERROR(availability_cannot_be_mixed,none,
+      "#available and #unavailable cannot be in the same statement", ())
 
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
@@ -1204,8 +1201,8 @@ ERROR(invalid_float_literal_missing_leading_zero,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
 ERROR(availability_query_outside_if_stmt_guard, none,
-      "#available may only be used as condition of an 'if', 'guard'"
-      " or 'while' statement", ())
+      "%0 may only be used as condition of an 'if', 'guard'"
+      " or 'while' statement", (StringRef))
 
 ERROR(empty_arg_label_underscore, none,
       "an empty argument label is spelled with '_'", ())

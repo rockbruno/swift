@@ -218,9 +218,8 @@ parse_operator:
       // so the code is invalid.  We get better recovery if we bail out from
       // this, because then we can produce a fixit to rewrite the && into a ,
       // if we're in a stmt-condition.
-      // FIXME
       if (Tok.getText() == "&&" &&
-          peekToken().isAny(tok::pound_available,
+          peekToken().isAny(tok::pound_available, tok::pound_unavailable,
                             tok::kw_let, tok::kw_var, tok::kw_case))
         goto done;
       
@@ -1636,12 +1635,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::l_square:
     return parseExprCollection();
 
-  case tok::pound_available: {
+  case tok::pound_available:
+  case tok::pound_unavailable: {
     // For better error recovery, parse but reject #available in an expr
     // context.
-    // FIXME
-    diagnose(Tok.getLoc(), diag::availability_query_outside_if_stmt_guard);
-    auto res = parseStmtConditionPoundAvailable(false);
+    diagnose(Tok.getLoc(), diag::availability_query_outside_if_stmt_guard, Tok.getText());
+    auto res = parseStmtConditionPoundAvailable();
     if (res.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (res.isParseError() || res.isNull())

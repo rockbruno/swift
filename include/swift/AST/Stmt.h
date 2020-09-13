@@ -340,8 +340,7 @@ class alignas(8) PoundAvailableInfo final :
   /// This is filled in by Sema.
   VersionRange VariantAvailableRange;
 
-  /// Indicates if the expression is checking if something is **not** available,
-  /// as represented by #available(...) == false.
+  /// Indicates that the expression is checking if something is **not** available.
   bool isUnavailability;
 
   PoundAvailableInfo(SourceLoc PoundLoc, SourceLoc LParenLoc,

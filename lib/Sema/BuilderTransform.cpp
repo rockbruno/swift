@@ -1232,6 +1232,7 @@ public:
     // have had the chance to adopt buildLimitedAvailability(), we'll upgrade
     // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
+      // FIXME: #unavailable
       SourceLoc loc = availabilityCond->getStartLoc();
       Type thenBodyType = solution.simplifyType(
           solution.getType(target.captured.second[0]));

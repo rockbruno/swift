@@ -437,13 +437,17 @@ private:
       // condition elements following it.
       auto *Query = Element.getAvailability();
 
-      // Prevent availability and unavailability from mixing, like
-      // if #available(...) == false, #available(...)
       if (isRefiningUnavailability == None) {
         isRefiningUnavailability = Query->getIsUnavailability();
       } else if (isRefiningUnavailability != Query->getIsUnavailability()) {
+        // Mixing availability with unavailability in the same statement will
+        // cause the false flow's version range to be ambiguous. Report it.
+        //
+        // Technically we can support this by not refining ambiguous flows,
+        // but there are currently no legitimate cases where one would have
+        // to mix availability with unavailability.
         Context.Diags.diagnose(Query->getLoc(),
-        diag::availability_cannot_be_positive_and_negative_at_same_time);
+        diag::availability_cannot_be_mixed);
         break;
       }
 
@@ -546,6 +550,7 @@ private:
       ++NestedCount;
     }
 
+
     Optional<AvailabilityContext> FalseRefinement = None;
     // The version range for the false branch should never have any versions
     // that weren't possible when the condition started evaluating.
@@ -569,7 +574,7 @@ private:
     if (!isRefiningUnavailability.hasValue() || !isRefiningUnavailability.getValue()) {
       return std::make_pair(NestedTRC->getAvailabilityInfo(), FalseRefinement);
     } else {
-      // If this is an unavailability check, simply invert the result.
+      // If this is an unavailability check, invert the result.
       return std::make_pair(FalseRefinement, NestedTRC->getAvailabilityInfo());
     }
   }
