@@ -46,3 +46,17 @@ func testUnavailableDoesntWarnUselessSpecs() {
   }
 }
 
+// Verify that #unavailable refines the availability of all "else" paths.
+// expected-note@+1 *{{add @available attribute to enclosing global function}}
+func testUnavailableExpandAllElsePaths() {
+  if #unavailable(OSX 998.0, *) {
+    foo() // expected-error{{'foo()' is only available in macOS 998.0 or newer}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  } else if 1 == 2 {
+    foo()
+  } else if 1 == 3 {
+    foo()
+  } else {
+    foo()
+  }
+}
