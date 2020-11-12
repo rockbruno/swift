@@ -1276,16 +1276,29 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     case StmtConditionElement::CK_Availability:
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
-      VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
+      PoundAvailableInfo *availability = elt.getAvailability();
+      VersionRange OSVersion = availability->getAvailableRange();
       assert(!OSVersion.isEmpty());
+
+      SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
 
       if (OSVersion.isAll()) {
         // If there's no check for the current platform, this condition is
         // trivially true.
-        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
         booleanTestValue = B.createIntegerLiteral(loc, i1, true);
       } else {
         booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion);
+        if (availability->getIsUnavailability()) {
+          // If this is an unavailability check, invert the result
+          // by emitting a call to Builtin.cmp_eq_Int1(lhs, 0).
+          SILValue zero = B.createIntegerLiteral(loc, i1, false);
+          booleanTestValue =
+            B.createBuiltinBinaryFunction(loc,
+                                          "cmp_eq",
+                                          i1,
+                                          i1,
+                                          {booleanTestValue, zero});
+        }
       }
       break;
     }
